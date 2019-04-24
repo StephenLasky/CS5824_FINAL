@@ -12,4 +12,3 @@ class FC_1(nn.Module):
     def forward(self, x):
         h1 = self.relu(self.linear1(x))
         y_pred = self.relu(self.linear2(h1))
-    
