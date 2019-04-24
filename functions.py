@@ -129,3 +129,37 @@ def seperate_xy_ims(ims):
             y[i, s:e] = ims[i, ys:ye]
 
     return x,y
+
+# for now, this function takes the top part of an image (x) and merges it into the bottom image (y)
+# these are taken and processed in vector form (im_vec)
+def combine_xy_ims(x, y):
+    assert x.shape[0] == y.shape[0] # ensure we have the same number of images
+
+    num_ims = x.shape[0]
+    x_dim = x.shape[1]
+    y_dim = y.shape[1]
+    f_dim = x_dim + y_dim
+
+    x_color_dim = int(x_dim / 3)
+    y_color_dim = int(y_dim / 3)
+    f_color_dim = int(f_dim / 3)
+
+    final_ims = np.zeros((num_ims, x_dim+y_dim))
+
+    for i in range(0,num_ims):
+        # for each color
+        for j in range(0,3):
+            xs = j * x_color_dim
+            xe = (j+1) * x_color_dim
+            ys = j * y_color_dim
+            ye = (j+1) * y_color_dim
+
+            fxs = j * f_color_dim
+            fxe = fxs + x_color_dim
+            fys = fxe
+            fye = fxs + f_color_dim
+
+            final_ims[i,fxs:fxe] = x[i,xs:xe]
+            final_ims[i,fys:fye] = y[i,ys:ye]
+
+    return final_ims
