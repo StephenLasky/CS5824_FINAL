@@ -50,6 +50,21 @@ def im_vec_to_im_std(im_vec):
 
     return im_std
 
+def im_vec_to_im_std(im_vec, im_width, im_height):
+    COLOR_OFFSET = im_height * im_width
+
+    im_std = np.zeros((im_height, im_width, 3))
+
+    for x in range(0, im_width):
+        for y in range(0, im_height):
+            # do for all 3 colors
+            base = y * im_width + x
+            im_std[y, x, 0] = im_vec[base]
+            im_std[y, x, 1] = im_vec[base + COLOR_OFFSET]
+            im_std[y, x, 2] = im_vec[base + 2 * COLOR_OFFSET]
+
+    return im_std
+
 # shows an image to the screen
 def show_im_std(im):
     from matplotlib import pyplot as plt
@@ -71,19 +86,46 @@ def comb_ims(ims, im_width, im_height):
         y = ims_per_side + 1
         while y * ims_per_side < num_ims:
             y += 1
-        big_im = np.zeros((32*y, 32*ims_per_side,3))
+        big_im = np.zeros((im_height*y, im_width*ims_per_side,3))
     else:
-        big_im = np.zeros((32*ims_per_side, 32*ims_per_side,3))
+        big_im = np.zeros((im_height*ims_per_side, im_width*ims_per_side,3))
 
     x, y, i, = 0, 0, 0
     ims_left = num_ims
     while ims_left > 0:
-        big_im[y:y+32, x:x+32] = im_vec_to_im_std(ims[i])
+        big_im[y:y+im_height, x:x+im_width] = im_vec_to_im_std(ims[i], im_width, im_height)
 
         i += 1
-        x = (i) % (ims_per_side) * 32
-        y = int(i / ims_per_side) * 32
+        x = (i) % (ims_per_side) * im_width
+        y = int(i / ims_per_side) * im_height
         ims_left -= 1
 
     return big_im
 
+# TODO: write THIS function next!
+# for now, we write this function so that it splits images perfectly horizontally!
+# input expectation: image vector of dim [num_ims x 3072]
+def seperate_xy_ims(ims):
+    num_ims = ims.shape[0]
+
+    OFFSET = 1024
+    HALF_OFFSET = int(OFFSET / 2)
+
+    x = np.zeros((num_ims, 3 * HALF_OFFSET))
+    y = np.zeros((num_ims, 3 * HALF_OFFSET))
+
+    for i in range(0,num_ims):
+
+        for j in range(0,3):
+            xs = j * OFFSET
+            xe = j * OFFSET + HALF_OFFSET
+            ys = j * OFFSET + HALF_OFFSET
+            ye = j * OFFSET + OFFSET
+
+            s = j * HALF_OFFSET
+            e = (j+1) * HALF_OFFSET
+
+            x[i, s:e] = ims[i, xs:xe]
+            y[i, s:e] = ims[i, ys:ye]
+
+    return x,y
