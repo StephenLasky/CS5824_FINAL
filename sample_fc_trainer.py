@@ -5,34 +5,44 @@ import functions as f
 import archs.fully_connected as fc
 import time
 import matplotlib.pyplot as plt
+import datasets
 
-LEARNING_RATE = 0.00025
-NUM_EPOCHS = 8000
-DECAY_EVERY = 50000
-BATCH_SIZE = 32
-TRAIN_SET_SIZE = BATCH_SIZE * 20
+LEARNING_RATE = 1e-4
+NUM_EPOCHS = 300
+DECAY_EVERY = 50
+BATCH_SIZE = 256
+NUM_BATCHES = 100
+TRAIN_SET_SIZE = BATCH_SIZE * NUM_BATCHES
+GAMMA = 0.1
 
 file_name = "data/cifar-10-batches-py/data_batch_1"
 data = f.unpickle(file_name)
 
-ims = f.open_data_ims(10000)
+ims = f.open_data_ims(50000)
 x,y = f.seperate_xy_ims(ims[0:TRAIN_SET_SIZE])
 
 # figure our device here
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available(): torch.set_default_tensor_type('torch.cuda.FloatTensor')
-print("Using device:{}".format(device))
+print("Using device:{}, cuda:{}, pytorch:{}".format(device, torch.version.cuda, torch.__version__))
 
-m = fc.FC_4(1536, 1536, 1536)
+m = fc.FC_1(1536, 1536, 1536)
 if torch.cuda.is_available(): m = m.cuda()  # transfer model to cuda as needed
 lossFunction = nn.L1Loss()
 optimizer = torch.optim.Adam(m.parameters(), lr=LEARNING_RATE)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=DECAY_EVERY, gamma=GAMMA)
 
 x = torch.tensor(x, dtype=torch.float)
 y = torch.tensor(y, dtype=torch.float)
 
-# regularize
-x, y = x / 256.0, y / 256.0
+x, y = x / 256.0, y / 256.0 # regularize
+
+# introduce a dataset class
+train_dataset = datasets.VectorizedDataset(x,y)
+train_loader = datasets.DataLoader(dataset=train_dataset,
+                                   batch_size=BATCH_SIZE,
+                                   shuffle=True,
+                                   num_workers=0)
 
 # remember loss graph
 losses = np.zeros(NUM_EPOCHS, dtype=np.float)
@@ -42,25 +52,26 @@ train_start_time = time.time()
 
 for epoch in range(NUM_EPOCHS):
     if epoch != 0 and epoch % int(NUM_EPOCHS/10) == 0:
-        print("{}% done!".format(epoch / NUM_EPOCHS * 100.0))
+        print("{}% done! loss:{}".format(epoch / NUM_EPOCHS * 100.0, losses[epoch-1]))
 
-    # learning rate decay here
-    if epoch != 0 and epoch % DECAY_EVERY == 0:
-        LEARNING_RATE /= 2
-        optimizer = torch.optim.Adam(m.parameters(), lr=LEARNING_RATE)
+    epoch_losses = 0.0
 
-    # perform BATCH grad_descent here
+    # perform MINI-BATCH grad_descent here
+    for i, data in enumerate(train_loader, 0):
+        x_batch, y_batch = data
+
+        y_pred = m.forward(x_batch)
+        loss = lossFunction(y_pred, y_batch)
+        epoch_losses += loss
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    losses[epoch] = epoch_losses / NUM_BATCHES
 
 
-    y_pred = m.forward(x)
-    loss = lossFunction(y_pred, y)
-    losses[epoch] = loss
-
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-
-print("Training took {}".format(time.time() - train_start_time))
+print("Training took {} seconds!".format(time.time() - train_start_time))
 
 # print loss graph
 print(losses)
