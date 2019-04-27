@@ -13,6 +13,8 @@ def train_fc(learning_rate = 1e-4,
              gamma = 0.1,
              batch_size=256,
              num_batches=100,
+             display_info = True,
+             hidden_width = 1536
              ):
     TRAIN_SET_SIZE = batch_size * num_batches
 
@@ -27,7 +29,7 @@ def train_fc(learning_rate = 1e-4,
     if torch.cuda.is_available(): torch.set_default_tensor_type('torch.cuda.FloatTensor')
     print("Using device:{}, cuda:{}, pytorch:{}".format(device, torch.version.cuda, torch.__version__))
 
-    m = fc.FC_4(1536, 1536, 1536)
+    m = fc.FC_1(1536, hidden_width, 1536)
     if torch.cuda.is_available(): m = m.cuda()  # transfer model to cuda as needed
     lossFunction = nn.L1Loss()
     optimizer = torch.optim.Adam(m.parameters(), lr=learning_rate)
@@ -71,20 +73,43 @@ def train_fc(learning_rate = 1e-4,
 
         losses[epoch] = epoch_losses / num_batches
 
-
     print("Training took {} seconds!".format(time.time() - train_start_time))
 
-    # print loss graph
-    print(losses)
-    plt.plot(losses)
-    plt.show()
+    if display_info:
+        # try to write this first layer to a video
+        v = m.linear1.weight[:,0:512].detach().cpu().numpy()
+        num_frames = v.shape[0]
+        v = v.reshape(num_frames, 16, 32)
+        v = np.absolute(v)
+        v = v * (1.0 / v.max()) * 255.0 # normailize 0->255
+        f.save_video(v)
 
-    # print results
-    y_pred = m.forward(x)
-    x, y_pred = x.cpu().detach().numpy(), y_pred.detach().cpu().numpy()
-    # x, y_pred = np.asarray(x.data), np.asarray(y_pred.data)
-    x, y_pred = x * 256.0, y_pred * 256.0
-    x, y_pred = x[0:50], y_pred[0:50]
-    fuse_xy_pred = f.combine_xy_ims(x,y_pred)
-    big_im = f.comb_ims(fuse_xy_pred,32,32)
-    f.show_im_std(big_im)
+        # print loss graph
+        print(losses)
+        plt.plot(losses)
+        plt.show()
+
+        # print results
+        y_pred = m.forward(x)
+        x, y_pred = x.cpu().detach().numpy(), y_pred.detach().cpu().numpy()
+        # x, y_pred = np.asarray(x.data), np.asarray(y_pred.data)
+        x, y_pred = x * 256.0, y_pred * 256.0
+        x, y_pred = x[0:50], y_pred[0:50]
+        fuse_xy_pred = f.combine_xy_ims(x,y_pred)
+        big_im = f.comb_ims(fuse_xy_pred,32,32)
+        f.show_im_std(big_im)
+
+        # print image of the last FIRST layer weights
+        s = m.linear1.weight[0,0:512].detach().cpu().numpy()
+        s = s.reshape(16,32)
+        s = np.absolute(s)
+        s *= (1.0 / s.max()) # normalize 0->1
+        plt.imshow(s, interpolation='nearest')
+        plt.show()
+
+
+
+
+
+
+    return losses[num_epochs-1]

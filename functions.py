@@ -1,6 +1,48 @@
 # imports here
 import numpy as np
 import math
+import cv2
+from matplotlib import pyplot as plt
+
+# take a 3/4d numpy array and convert it to and save it as a video sequence
+# we expect the following format: num_frames x height x width x color_depth
+def save_video(frames, video_filename="video"):
+    num_frames, height, width = frames.shape
+
+    # forcibly expand save_video such that it contains three color channels
+    new_v = np.zeros((num_frames, height, width, 3), dtype=np.uint8)
+    for i in range(0,3): new_v[:,:,:,i] = frames
+    frames = new_v
+
+    # trial
+    # frames[:,0,1:32,0] = 255
+
+    # UPSCALE HERE
+    f = 30
+    new_w, new_h = width *f, height * f
+    new_v = np.zeros((num_frames, new_h, new_w,3), dtype=np.uint8)
+    for frame in range(0,num_frames):
+        new_v[frame] = cv2.resize(frames[frame], dsize=(new_w, new_h), interpolation=cv2.INTER_AREA)
+    frames = new_v
+    width = new_w
+    height = new_h
+
+    # new_v = np.zeros((num_frames,height, width), dtype=np.uint8)
+    # new_v[:,:,:] = frames
+
+    # initialize video writer
+    fourcc = cv2.VideoWriter_fourcc('M', 'J', 'P', 'G')
+    fps = 30
+    video_filename += '.avi'
+    video = cv2.VideoWriter(video_filename, fourcc, fps, (width, height))
+
+    for frame in range(0,num_frames):
+        video.write(frames[frame])
+
+    video.release()
+
+
+
 
 # used for opening the cifar-10 data
 def unpickle(file):
@@ -67,7 +109,6 @@ def im_vec_to_im_std(im_vec, im_width, im_height):
 
 # shows an image to the screen
 def show_im_std(im):
-    from matplotlib import pyplot as plt
     im /= 255
 
     plt.imshow(im, interpolation='nearest')
