@@ -41,9 +41,6 @@ def save_video(frames, video_filename="video"):
 
     video.release()
 
-
-
-
 # used for opening the cifar-10 data
 def unpickle(file):
     import pickle
@@ -204,3 +201,64 @@ def combine_xy_ims(x, y):
             final_ims[i,fys:fye] = y[i,ys:ye]
 
     return final_ims
+
+# this is used to generate the custom data
+def generate_custom_data(num_x_rows, num_y_rows, data, width, height):
+    num_ims = data.shape[0]
+    num_data_per_im = (height - (num_x_rows+num_y_rows) + 1)
+    num_data_generated = num_ims * num_data_per_im
+    NUM_COLOR_CHANNELS = 3
+
+    x = np.zeros((num_data_generated, width * num_x_rows * NUM_COLOR_CHANNELS))
+    y = np.zeros((num_data_generated, width * num_y_rows * NUM_COLOR_CHANNELS))
+
+    i = 0                       # used to keep track of which example we are currently on
+    x_size = num_x_rows * width
+    y_size = num_y_rows * width
+    d_size = width * height
+    for im in range(0,num_ims):                          # for each image
+        for j in range(0, num_data_per_im ):             # for each new example
+            r_offset = j * width
+            xs = r_offset
+            xe = r_offset+x_size
+            ys = xe
+            ye = ys + y_size
+
+            for c in range(0,3): # DO THE COLORS
+                x[i, c*x_size:(c+1)*x_size] = data[im, xs:xe]
+                y[i, c*y_size:(c+1)*y_size] = data[im, ys:ye]
+
+                xs += d_size
+                xe += d_size
+                ys += d_size
+                ye += d_size
+
+            i += 1                                      # increment the example that we are on
+
+    assert i == num_data_generated
+
+    return x,y
+
+# extracts vector rows from a vector image and returns a vector image
+# rs : row start
+# re : row end (noninclusive)
+# rw : row width
+# im : vectorized image rows are being pulled from
+def extract_vec_rows(rs, re, rw, im):
+    COLOR_CHANNELS = 3
+    # re-rs should be fine because re is exclusive
+    ret_im = np.zeros(((re-rs)*rw*COLOR_CHANNELS), dtype=im.dtype)
+
+    # compute column height
+    ch = int(im.shape[0] / (COLOR_CHANNELS * rw))
+    im_color_offset = rw * ch
+    im_base_offset = rw * rs
+
+    cp_width = (re-rs)*rw   # copy width
+    for i in range(0,COLOR_CHANNELS):
+        ims = im_base_offset + im_color_offset * i  # image start
+        ime = ims + cp_width                        # image end
+
+        ret_im[i*cp_width:(i+1)*cp_width] = im[ims:ime]
+
+    return ret_im
