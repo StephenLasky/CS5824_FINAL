@@ -262,3 +262,28 @@ def extract_vec_rows(rs, re, rw, im):
         ret_im[i*cp_width:(i+1)*cp_width] = im[ims:ime]
 
     return ret_im
+
+# takes a vectorized image im, and pastes the vectorized rows from v over the image
+# rs : row start
+# re : row end (noninclusive)
+# rw : row width
+# im : vectorized image rows are being pasted to
+# v  : image being pasted from
+def paste_over_rows(rs, re, rw, im, v):
+    COLOR_CHANNELS = 3
+
+    # compute column height
+    ch = int(im.shape[0] / (COLOR_CHANNELS * rw))
+    im_color_offset = rw * ch
+    im_base_offset = rw * rs
+
+    cp_width = (re - rs) * rw  # copy width
+    for i in range(0, COLOR_CHANNELS):
+        ims = im_base_offset + im_color_offset * i  # image start
+        ime = ims + cp_width  # image end
+        vs = i * cp_width
+        ve = (i+1) * cp_width
+
+        im[ims:ime] = v[vs:ve]
+
+    return im
