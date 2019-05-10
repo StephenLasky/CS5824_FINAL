@@ -105,15 +105,16 @@ def im_vec_to_im_std(im_vec, im_width, im_height):
     return im_std
 
 # shows an image to the screen
-def show_im_std(im):
+def show_im_std(im, title="No title"):
     im /= 255
 
     plt.imshow(im, interpolation='nearest')
+    plt.title(label=title)
     plt.show()
 
-def show_im_vec(im):
+def show_im_vec(im, title="No title"):
     im = im_vec_to_im_std(im)
-    show_im_std(im)
+    show_im_std(im, title)
 
 # combines vec ims into a large combined std_im
 def comb_ims(ims, im_width, im_height):

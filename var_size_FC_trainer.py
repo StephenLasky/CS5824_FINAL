@@ -52,7 +52,7 @@ def train_fc(learning_rate = 1e-4,
     print("Using device:{}, cuda:{}, pytorch:{}".format(device, torch.version.cuda, torch.__version__))
 
     # set up model, optimizer, scheduler
-    m = fc.FC_2(input_width, hidden_width, output_width)
+    m = fc.FC_4(input_width, hidden_width, output_width)
     if torch.cuda.is_available(): m = m.cuda()  # transfer model to cuda as needed
     lossFunction = nn.L1Loss()
     optimizer = torch.optim.Adam(m.parameters(), lr=learning_rate)
@@ -127,5 +127,11 @@ def train_fc(learning_rate = 1e-4,
     big_im = f.comb_ims(ims, 32, 32)
 
     if display_info:
-        f.show_im_std(big_im)
+        title = "LR:{} decay:{} epochs:{} batch:{} num_batch:{} hidden:{}".format(learning_rate,
+                                                                                decay_every,
+                                                                                num_epochs,
+                                                                                batch_size,
+                                                                                train_dataset.__sizeof__(),
+                                                                                hidden_width)
+        f.show_im_std(big_im, title=title)
     # all should now be predicted. lets display them!
