@@ -141,6 +141,40 @@ def comb_ims(ims, im_width, im_height):
 
     return big_im
 
+# combines std ims into a large combined std_im
+def comb_ims_std(ims):
+    # ims /= 255.0    # regularize?
+
+    num = ims.shape[0]
+    h = ims.shape[1]
+    w = ims.shape[2]
+
+    num_rows = 1
+    num_cols = num
+
+    # determine the number of rows and columns to get approximately a square
+    while num_rows * w < num_cols * h:
+        num_rows += 1
+        num_cols = num / num_rows
+
+    num_cols = int(math.ceil(num_cols))
+
+    # define the canvas that they will be painted onto
+    big_im = np.zeros((num_cols * h, num_rows * w, 3), dtype = ims.dtype)
+
+    # paint the canvas
+    for i in range(0,num):
+        ix = int(i/num_rows) * w
+        iy = (i % num_cols) * h
+
+        big_im[iy:iy+h, ix:ix+w] = ims[i]
+
+    return big_im
+
+
+
+
+
 # TODO: write THIS function next!
 # for now, we write this function so that it splits images perfectly horizontally!
 # input expectation: image vector of dim [num_ims x 3072]
@@ -202,6 +236,27 @@ def combine_xy_ims(x, y):
             final_ims[i,fys:fye] = y[i,ys:ye]
 
     return final_ims
+
+# x: in STD form
+# y: in STD form
+def combine_xy_ims_std(x,y):
+
+    num = x.shape[0]
+    imhx = x.shape[1]
+    imwx = x.shape[2]
+    imhy = y.shape[1]
+    imwy = y.shape[2]
+    channels = x.shape[3]
+
+    combined = np.zeros((num, imhx+imhy, imwx, channels), dtype=x.dtype)
+
+    for i in range(0,num):
+        combined[i,0:imhx] = x[i]
+        combined[i,imhx:] = y[i]
+
+    return combined
+
+
 
 # this is used to generate the custom data
 def generate_custom_data(num_x_rows, num_y_rows, data, width, height):
@@ -288,3 +343,93 @@ def paste_over_rows(rs, re, rw, im, v):
         im[ims:ime] = v[vs:ve]
 
     return im
+
+# returns a basic dataset of for x,y
+# the dataset is in "standard image form" (image stored as XxYx3
+def load_basic_dataset_std(num):
+    ims = open_data_ims(50000)
+    x, y = seperate_xy_ims(ims[0:num])
+
+    im_h = 16
+    im_w = 32
+    num_channels = 3
+
+    new_x = np.zeros((num, im_h, im_w, num_channels))
+    new_y = np.zeros((num, im_h, im_w, num_channels))
+
+    for i in range(0,num):
+        new_x[i] = im_vec_to_im_std(x[i], im_w, im_h)
+        new_y[i] = im_vec_to_im_std(y[i], im_w, im_h)
+
+    return new_x,new_y
+
+# returns basic dataset for x,y in form CHANNELS by HEIGHT by WIDTH
+def load_basic_dataset_chw(num):
+    x,y = load_basic_dataset_std(num)
+
+    channels = x.shape[3]
+    imw = x.shape[2]
+    imh = x.shape[1]
+
+    x_new = np.zeros((num,channels, imh, imw), dtype=x.dtype)
+    y_new = np.zeros((num,channels, imh, imw), dtype=x.dtype)
+
+    for i in range(0,num):
+        x_new[i] = std_im_to_chw(x[i])
+        y_new[i] = std_im_to_chw(y[i])
+
+    return x_new, y_new
+
+
+# converts 1 single std_im to 1 single chw_im
+# a chw image is an image that is stored in the form: CHANNEL x HEIGHT x WIDTH
+def std_im_to_chw(im):
+    channels = im.shape[2]
+    imw = im.shape[1]
+    imh = im.shape[0]
+
+    im_new = np.zeros((channels, imh, imw), dtype=im.dtype)
+
+    for c in range(0,channels):
+        im_new[c] = im[:,:,c]
+
+    return im_new
+
+# reverses the effects of std_im_to_chw()
+def chw_im_to_std(im):
+    channels = im.shape[0]
+    imh = im.shape[1]
+    imw = im.shape[2]
+
+    im_new = np.zeros((imh, imw, channels), dtype=im.dtype)
+
+    for c in range(0,channels):
+        im_new[:, :, c] = im[c]
+
+    return im_new
+
+# performs same function as chw_im_to_std, but on multiple at the same time
+def chw_ims_to_std(ims):
+    num = ims.shape[0]
+
+    channels = ims.shape[1]
+    imh = ims.shape[2]
+    imw = ims.shape[3]
+
+    ims_new = np.zeros((num,imh, imw, channels), dtype=ims.dtype)
+
+    for i in range(0,num):
+        ims_new[i] = chw_im_to_std(ims[i])
+
+    return ims_new
+
+def regularize_data(data):
+    print("Regularize data: min:{} mean:{} max:{}".format(np.min(data), np.mean(data), np.max(data)))
+    data /= 255.0
+    return data
+def deregularize_data(data):
+    data *= 255.0
+    return data
+
+def regularize_0_1(data):
+    return data-np.min(data)/(np.max(data)-np.min(data))
