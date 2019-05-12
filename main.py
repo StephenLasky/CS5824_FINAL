@@ -18,35 +18,36 @@ import basic_CNN_trainer
 #               shuffle_data=False,
 #               display_info=False)
 
+DATA_FOLDER = "./data/custom/"
 
-train_size = 40 * 1024
+
+train_size = 47 * 1024
 test_size = 1024
 size = train_size + test_size
 
-
-x, y = f.load_basic_dataset_chw(size)
-x, y = f.regularize_data(x), f.regularize_data(y)
-
-x_train = x[0:train_size]
-y_train = y[0:train_size]
-x_test = x[train_size:]
-y_test = y[train_size:]
+# x, y = f.load_basic_dataset_chw(size)
+# x, y = f.regularize_data(x), f.regularize_data(y)
+#
+# x_train = x[0:train_size]
+# y_train = y[0:train_size]
+# x_test = x[train_size:]
+# y_test = y[train_size:]
 # x_test = x[0:train_size]
 # y_test = y[0:train_size]
 
+x_train = torch.load(DATA_FOLDER+"x_train.pt")
+y_train = torch.load(DATA_FOLDER+"y_train.pt")
+x_test = torch.load(DATA_FOLDER+"x_test.pt")
+y_test = torch.load(DATA_FOLDER+"y_test.pt")
+
 m = cnns.CNN_7()
 m = basic_CNN_trainer.train(x_train, y_train,  m, x_test=x_test, y_test=y_test,
-                            num_epochs=40,
-                            decay_every=40,
-                            learning_rate=1e-3,
+                            num_epochs=10,
+                            decay_every=10,
+                            learning_rate=1.5e-3,
                             batch_size= 1024)
 
-# y_ = torch.tensor(x, dtype=torch.float)
-# z = m.forward(x)
-# z = z.cpu().detach().numpy()
-# z = f.chw_im_to_std(z[0])
-# z *= 256.0
-# f.show_im_std(z)
+
 
 # get, transform, and display test results
 if torch.cuda.is_available(): torch.set_default_tensor_type('torch.cuda.FloatTensor')
