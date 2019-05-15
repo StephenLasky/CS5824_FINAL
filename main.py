@@ -22,7 +22,7 @@ DATA_FOLDER = "./data/custom/"
 
 
 train_size = 47 * 1024
-test_size = 1024
+test_size = 2* 256
 size = train_size + test_size
 
 # x, y = f.load_basic_dataset_chw(size)
@@ -40,11 +40,15 @@ y_train = torch.load(DATA_FOLDER+"y_train.pt")
 x_test = torch.load(DATA_FOLDER+"x_test.pt")
 y_test = torch.load(DATA_FOLDER+"y_test.pt")
 
-m = cnns.CNN_7()
+# shift train and test sizes
+x_train, y_train = x_train[0:train_size], y_train[0:train_size]
+x_test, y_test = x_test[0:test_size], y_test[0:test_size]
+
+m = cnns.CNN_10()
 m = basic_CNN_trainer.train(x_train, y_train,  m, x_test=x_test, y_test=y_test,
-                            num_epochs=10,
-                            decay_every=10,
-                            learning_rate=1.5e-3,
+                            num_epochs=300,
+                            decay_every=50,
+                            learning_rate=1e-3,
                             batch_size= 1024)
 
 
