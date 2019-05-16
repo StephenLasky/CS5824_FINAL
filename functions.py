@@ -3,6 +3,7 @@ import numpy as np
 import math
 import cv2
 from matplotlib import pyplot as plt
+import torch
 
 # take a 3/4d numpy array and convert it to and save it as a video sequence
 # we expect the following format: num_frames x height x width x color_depth
@@ -50,10 +51,12 @@ def unpickle(file):
 
 # returns a numpy matrix with the first 'number' of images (CIFAR-10)
 # currently only supports multiples of 10000
-def open_data_ims(number):
+def open_data_ims(number,
+                  batch_files=["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5"]
+                  ):
     IMG_SIZE = 3072
     IMS_IN_BATCH = 10000
-    batch_files = ["data_batch_1", "data_batch_2", "data_batch_3", "data_batch_4", "data_batch_5"]
+
     batch_files_directory = "./data/cifar-10-batches-py/"
 
     # will store ims such that each row represents one image
@@ -73,9 +76,9 @@ def open_data_ims(number):
     return ims
 
 # converts an image vector into a standard image
-def im_vec_to_im_std(im_vec):
-    IM_WIDTH = 32
-    IM_HEIGHT = 32
+def im_vec_to_im_std(im_vec, im_width = 32, im_height = 32):
+    IM_WIDTH = im_width
+    IM_HEIGHT = im_height
     COLOR_OFFSET = IM_HEIGHT * IM_WIDTH
 
     im_std = np.zeros((IM_HEIGHT,IM_WIDTH,3))
@@ -89,20 +92,6 @@ def im_vec_to_im_std(im_vec):
 
     return im_std
 
-def im_vec_to_im_std(im_vec, im_width, im_height):
-    COLOR_OFFSET = im_height * im_width
-
-    im_std = np.zeros((im_height, im_width, 3))
-
-    for x in range(0, im_width):
-        for y in range(0, im_height):
-            # do for all 3 colors
-            base = y * im_width + x
-            im_std[y, x, 0] = im_vec[base]
-            im_std[y, x, 1] = im_vec[base + COLOR_OFFSET]
-            im_std[y, x, 2] = im_vec[base + 2 * COLOR_OFFSET]
-
-    return im_std
 
 # shows an image to the screen
 def show_im_std(im, title="No title"):
@@ -112,8 +101,23 @@ def show_im_std(im, title="No title"):
     plt.title(label=title)
     plt.show()
 
-def show_im_vec(im, title="No title"):
-    im = im_vec_to_im_std(im)
+def show_im_vec(im, title="No title", height=32, width=32):
+    s = height*width
+    r = im[0:s]
+    g = im[s:2*s]
+    b = im[2*s:3*s]
+
+    r = np.reshape(r, (height, width))
+    g = np.reshape(g, (height, width))
+    b = np.reshape(b, (height, width))
+
+    im_std = np.zeros((height,width,3), dtype=im.dtype)
+    im_std[:, :, 0] = r
+    im_std[:, :, 1] = g
+    im_std[:, :, 2] = b
+
+    im = im_std
+
     show_im_std(im, title)
 
 # combines vec ims into a large combined std_im
@@ -433,3 +437,107 @@ def deregularize_data(data):
 
 def regularize_0_1(data):
     return data-np.min(data)/(np.max(data)-np.min(data))
+
+def im_std_to_xy_pair(im_std):
+    return im_std[0:16], im_std[16:32]
+
+# creates a vectorized rotated dataset version of CIFAR-10
+def generate_rotated_CIFAR10_dataset_vec():
+    # prepare GPU
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if torch.cuda.is_available(): torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    print("Using device:{}, cuda:{}, pytorch:{}".format(device, torch.version.cuda, torch.__version__))
+
+    # do the TEST batch
+    n = 10000
+    ims = open_data_ims(n, ["test_batch"])
+
+    r = ims[:, 0:1024]
+    g = ims[:, 1024:2048]
+    b = ims[:, 2048:3072]
+
+    r = np.reshape(r, (n, 32, 32))
+    g = np.reshape(g, (n, 32, 32))
+    b = np.reshape(b, (n, 32, 32))
+
+    ims_std = np.zeros((n, 32, 32, 3), dtype=ims.dtype)
+
+    ims_std[:, :, :, 0] = r
+    ims_std[:, :, :, 1] = g
+    ims_std[:, :, :, 2] = b
+
+    x_std = ims_std[:, 0:16]
+    y_std = ims_std[:, 16:32]
+
+    x_vec = np.zeros((n, 1536), dtype=ims.dtype)
+    y_vec = np.zeros((n, 1536), dtype=ims.dtype)
+
+    # do red green blue color channels for x_vec and y_vec
+    x_vec[:, 0:512] = np.reshape(ims_std[:, 0:16, :, 0], (n, 512))
+    x_vec[:, 512:1024] = np.reshape(ims_std[:, 0:16, :, 1], (n, 512))
+    x_vec[:, 1024:1536] = np.reshape(ims_std[:, 0:16, :, 2], (n, 512))
+
+    y_vec[:, 0:512] = np.reshape(ims_std[:, 16:32, :, 0], (n, 512))
+    y_vec[:, 512:1024] = np.reshape(ims_std[:, 16:32, :, 1], (n, 512))
+    y_vec[:, 1024:1536] = np.reshape(ims_std[:, 16:32, :, 2], (n, 512))
+
+    # z = comb_ims(x_vec[0:100], im_width=32, im_height=16)
+    # show_im_vec(z, width=32, height=16)
+
+    x_tensor = torch.from_numpy(x_vec).float().to(device)
+    y_tensor = torch.from_numpy(y_vec).float().to(device)
+
+    save_folder = "./data/vec_rotated_200k/"
+
+    torch.save(x_tensor, save_folder + "x_test.pt")
+    torch.save(y_tensor, save_folder + "y_test.pt")
+
+    # do TRAIN batch
+    n = 50000
+    ims = open_data_ims(n)
+
+    r = ims[:,0:1024]
+    g = ims[:,1024:2048]
+    b = ims[:,2048:3072]
+
+    r = np.reshape(r, (n, 32, 32))
+    g = np.reshape(g, (n, 32, 32))
+    b = np.reshape(b, (n, 32, 32))
+
+    ims_std = np.zeros((n,32,32,3), dtype=ims.dtype)
+
+    ims_std[:, :, :, 0] = r
+    ims_std[:, :, :, 1] = g
+    ims_std[:, :, :, 2] = b
+
+    new_ims_std = np.zeros((n*4,32,32,3), dtype=ims.dtype)
+    for i in range(0,n):
+        for j in range(0,4):
+            new_ims_std[4*i+j] = np.rot90(ims_std[i], j)
+
+    N = n*4
+
+    x_std = ims_std[:, 0:16]
+    y_std = ims_std[:,16:32]
+
+    x_vec = np.zeros((N, 1536), dtype=ims.dtype)
+    y_vec = np.zeros((N, 1536), dtype=ims.dtype)
+
+    # do red green blue color channels for x_vec and y_vec
+    x_vec[:, 0:512] = np.reshape(new_ims_std[:, 0:16, :, 0], (N, 512))
+    x_vec[:, 512:1024] = np.reshape(new_ims_std[:, 0:16, :, 1], (N, 512))
+    x_vec[:, 1024:1536] = np.reshape(new_ims_std[:, 0:16, :, 2], (N, 512))
+
+    y_vec[:, 0:512] = np.reshape(new_ims_std[:, 16:32, :, 0], (N, 512))
+    y_vec[:, 512:1024] = np.reshape(new_ims_std[:, 16:32, :, 1], (N, 512))
+    y_vec[:, 1024:1536] = np.reshape(new_ims_std[:, 16:32, :, 2], (N, 512))
+
+    # convert to GPU torch tensor
+
+    x_tensor = torch.from_numpy(x_vec).float().to(device)
+    y_tensor = torch.from_numpy(y_vec).float().to(device)
+
+    save_folder = "./data/vec_rotated_200k/"
+
+    torch.save(x_tensor, save_folder + "x_train.pt")
+    torch.save(y_tensor, save_folder + "y_train.pt")
